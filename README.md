@@ -13,17 +13,7 @@ BSD-style license found in the LICENSE file.
 - Kept updated with upstream Go (except any telemetry related code)
 - Once built, can be used to bootstrap future Go versions
 
-### Download and Install
-
-#### Quick Install
-
-Install via the automated installer script:
-
-```bash
-curl -fsSL https://raw.githubusercontent.com/Sudo-Ivan/go-no-telemetry/master/install.sh | sh
-```
-
-Or download and run manually:
+### Build and install via the single script:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/Sudo-Ivan/go-no-telemetry/master/install.sh -o install.sh
@@ -31,7 +21,7 @@ chmod +x install.sh
 ./install.sh
 ```
 
-#### Build and install from source
+### Build and install from source
 
 Linux/macOS/BSD:
 
