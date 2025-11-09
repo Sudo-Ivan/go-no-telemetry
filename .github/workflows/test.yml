@@ -1,0 +1,38 @@
+name: Build and Test
+
+on:
+  push:
+    branches: [ master, main ]
+  pull_request:
+    branches: [ master, main ]
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      checks: write
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v5
+    
+    - name: Set up Go (bootstrap)
+      uses: actions/setup-go@v5
+      with:
+        go-version: '1.25'
+    
+    - name: Install dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y gcc git
+    
+    - name: Build and test Go
+      working-directory: src
+      run: ./all.bash
+    
+    - name: Verify build
+      run: |
+        ./bin/go version
+        ./bin/go test -short std
