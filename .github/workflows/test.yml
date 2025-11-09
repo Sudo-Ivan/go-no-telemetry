@@ -31,8 +31,3 @@ jobs:
     - name: Build and test Go
       working-directory: src
       run: ./all.bash
-    
-    - name: Verify build
-      run: |
-        ./bin/go version
-        ./bin/go test -short std
