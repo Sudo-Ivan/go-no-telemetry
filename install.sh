@@ -254,6 +254,9 @@ install_system() {
         $SUDO_CMD cp "$TOOL_DIR"/* "$SYSTEM_TOOL_DIR/"
         $SUDO_CMD chmod +x "$SYSTEM_TOOL_DIR"/*
         
+        info "Installing standard library source..."
+        $SUDO_CMD cp -r "$REPO_DIR/src" /usr/lib/go/ 2>/dev/null || true
+        
         success "Installed to $DEFAULT_SYSTEM_GO_DIR"
         success "Installed toolchain to $SYSTEM_TOOL_DIR"
     else
@@ -271,11 +274,15 @@ install_system() {
         $SUDO_CMD cp "$TOOL_DIR"/* "$CUSTOM_TOOL_DIR/"
         $SUDO_CMD chmod +x "$CUSTOM_TOOL_DIR"/*
         
+        info "Installing standard library source..."
+        $SUDO_CMD cp -r "$REPO_DIR/src" "$install_dir/"
+        
         detect_shell_config
         add_to_path "$install_dir/bin"
         
         success "Installed to $install_dir/bin"
         success "Installed toolchain to $CUSTOM_TOOL_DIR"
+        success "Installed source to $install_dir/src"
         info "Added to PATH in $SHELL_CONFIG"
         printf "${YELLOW}Please run: source $SHELL_CONFIG${NC}\n"
         printf "${CYAN}Set GOROOT=$install_dir if needed${NC}\n"
@@ -304,11 +311,15 @@ install_renamed() {
     $SUDO_CMD cp "$TOOL_DIR"/* "$CUSTOM_TOOL_DIR/"
     $SUDO_CMD chmod +x "$CUSTOM_TOOL_DIR"/*
     
+    info "Installing standard library source..."
+    $SUDO_CMD cp -r "$REPO_DIR/src" "$install_dir/"
+    
     detect_shell_config
     add_to_path "$install_dir/bin"
     
     success "Installed as $go_name and $gofmt_name"
     success "Installed toolchain to $CUSTOM_TOOL_DIR"
+    success "Installed source to $install_dir/src"
     info "Added to PATH in $SHELL_CONFIG"
     printf "${YELLOW}Please run: source $SHELL_CONFIG${NC}\n"
     printf "${CYAN}Use: $go_name version${NC}\n"
