@@ -241,6 +241,10 @@ install_system() {
     local install_dir="$1"
     local override="$2"
     
+    if [ -z "$USER" ]; then
+        USER=$(id -un)
+    fi
+    
     get_go_platform
     
     if [ "$override" = "yes" ]; then
@@ -299,6 +303,9 @@ install_system() {
         info "Installing standard library source..."
         $SUDO_CMD cp -r "$REPO_DIR/src" "$install_dir/"
         
+        info "Changing ownership to $USER..."
+        $SUDO_CMD chown -R "$USER:$USER" "$install_dir"
+        
         detect_shell_config
         add_to_path "$install_dir/bin"
         
@@ -316,6 +323,10 @@ install_renamed() {
     local install_dir="$1"
     local go_name="$2"
     local gofmt_name="$3"
+    
+    if [ -z "$USER" ]; then
+        USER=$(id -un)
+    fi
     
     get_go_platform
     
@@ -341,6 +352,9 @@ install_renamed() {
     
     info "Installing standard library source..."
     $SUDO_CMD cp -r "$REPO_DIR/src" "$install_dir/"
+    
+    info "Changing ownership to $USER..."
+    $SUDO_CMD chown -R "$USER:$USER" "$install_dir"
     
     detect_shell_config
     add_to_path "$install_dir/bin"
