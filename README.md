@@ -16,7 +16,7 @@ BSD-style license found in the LICENSE file.
 ### Build and install via the single script:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/Sudo-Ivan/go-no-telemetry/master/install.sh -o install.sh
+curl -fsSL https://raw.githubusercontent.com/Sudo-Ivan/go-no-telemetry/refs/heads/no-telemetry-go1.24.10/install.sh -o install.sh
 chmod +x install.sh
 ./install.sh
 ```
@@ -26,7 +26,7 @@ chmod +x install.sh
 Linux/macOS/BSD:
 
 ```bash
-git clone https://github.com/Sudo-Ivan/go-no-telemetry.git
+git clone --branch no-telemetry-go1.24.10 https://github.com/Sudo-Ivan/go-no-telemetry.git
 cd go-no-telemetry/src
 ./make.bash  # or ./all.bash for full tests
 ```
@@ -34,7 +34,7 @@ cd go-no-telemetry/src
 Windows:
 
 ```bash
-git clone https://github.com/Sudo-Ivan/go-no-telemetry.git
+git clone --branch no-telemetry-go1.24.10 https://github.com/Sudo-Ivan/go-no-telemetry.git
 cd go-no-telemetry/src
 ./make.bat  # or ./all.bat for full tests
 ```
