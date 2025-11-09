@@ -31,16 +31,6 @@ chmod +x install.sh
 ./install.sh
 ```
 
-The installer will:
-- Clone the repository
-- Check for required dependencies (Go 1.22+, git, gcc)
-- Build Go (with or without tests)
-- Offer installation options:
-  - Override system Go installation
-  - Install to custom directory with PATH setup
-  - Install with renamed binaries
-- Automatically detect and configure your shell (bash, zsh, fish)
-
 #### Build and install from source
 
 Linux/macOS/BSD:
