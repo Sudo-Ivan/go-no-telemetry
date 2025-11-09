@@ -9,7 +9,6 @@ require (
 	golang.org/x/mod v0.29.0
 	golang.org/x/sync v0.17.0
 	golang.org/x/sys v0.37.0
-	golang.org/x/telemetry v0.0.0-20251008203120-078029d740a8
 	golang.org/x/term v0.34.0
 	golang.org/x/tools v0.38.1-0.20251015192825-7d9453ccc0f5
 )
