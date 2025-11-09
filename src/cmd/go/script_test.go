@@ -30,8 +30,6 @@ import (
 	"cmd/go/internal/vcweb/vcstest"
 	"cmd/internal/script"
 	"cmd/internal/script/scripttest"
-
-	"golang.org/x/telemetry/counter/countertest"
 )
 
 var testSum = flag.String("testsum", "", `may be tidy, listm, or listall. If set, TestScript generates a go.sum file at the beginning of each test and updates test files if they pass.`)
@@ -372,39 +370,10 @@ func updateSum(t testing.TB, e *script.Engine, s *script.State, archive *txtar.A
 }
 
 func readCounters(t *testing.T, telemetryDir string) map[string]uint64 {
-	localDir := filepath.Join(telemetryDir, "local")
-	dirents, err := os.ReadDir(localDir)
-	if err != nil {
-		if os.IsNotExist(err) {
-			return nil // The Go command didn't ever run so the local dir wasn't created
-		}
-		t.Fatalf("reading telemetry local dir: %v", err)
-	}
-	totals := map[string]uint64{}
-	for _, dirent := range dirents {
-		if dirent.IsDir() || !strings.HasSuffix(dirent.Name(), ".count") {
-			// not a counter file
-			continue
-		}
-		counters, _, err := countertest.ReadFile(filepath.Join(localDir, dirent.Name()))
-		if err != nil {
-			t.Fatalf("reading counter file: %v", err)
-		}
-		for k, v := range counters {
-			totals[k] += v
-		}
-	}
-
-	return totals
+	return map[string]uint64{}
 }
 
 func checkCounters(t *testing.T, telemetryDir string) {
-	counters := readCounters(t, telemetryDir)
-	if _, ok := scriptGoInvoked.Load(testing.TB(t)); ok {
-		if !disabledOnPlatform && len(counters) == 0 {
-			t.Fatal("go was invoked but no counters were incremented")
-		}
-	}
 }
 
 // Copied from https://go.googlesource.com/telemetry/+/5f08a0cbff3f/internal/telemetry/mode.go#122

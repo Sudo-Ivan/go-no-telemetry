@@ -1,42 +1,40 @@
-# The Go Programming Language
+# The Go Programming Language with no telemetry
 
 Go is an open source programming language that makes it easy to build simple,
 reliable, and efficient software.
 
-![Gopher image](https://golang.org/doc/gopher/fiveyears.jpg)
-*Gopher image by [Renee French][rf], licensed under [Creative Commons 4.0 Attribution license][cc4-by].*
-
-Our canonical Git repository is located at https://go.googlesource.com/go.
-There is a mirror of the repository at https://github.com/golang/go.
-
 Unless otherwise noted, the Go source files are distributed under the
 BSD-style license found in the LICENSE file.
 
-### Download and Install
+## Features of this fork
 
-#### Binary Distributions
+- No telemetry
+- No code contacting remote servers
+- Kept updated with upstream Go (except any telemetry related code)
+- Once built, can be used to bootstrap future Go versions
 
-Official binary distributions are available at https://go.dev/dl/.
+### Build and install via the single script:
 
-After downloading a binary release, visit https://go.dev/doc/install
-for installation instructions.
+```bash
+curl -fsSL https://raw.githubusercontent.com/Sudo-Ivan/go-no-telemetry/master/install.sh -o install.sh
+chmod +x install.sh
+./install.sh
+```
 
-#### Install From Source
+### Build and install from source
 
-If a binary distribution is not available for your combination of
-operating system and architecture, visit
-https://go.dev/doc/install/source
-for source installation instructions.
+Linux/macOS/BSD:
 
-### Contributing
+```bash
+git clone https://github.com/Sudo-Ivan/go-no-telemetry.git
+cd go-no-telemetry/src
+./make.bash  # or ./all.bash for full tests
+```
 
-Go is the work of thousands of contributors. We appreciate your help!
+Windows:
 
-To contribute, please read the contribution guidelines at https://go.dev/doc/contribute.
-
-Note that the Go project uses the issue tracker for bug reports and
-proposals only. See https://go.dev/wiki/Questions for a list of
-places to ask questions about the Go language.
-
-[rf]: https://reneefrench.blogspot.com/
-[cc4-by]: https://creativecommons.org/licenses/by/4.0/
+```bash
+git clone https://github.com/Sudo-Ivan/go-no-telemetry.git
+cd go-no-telemetry/src
+./make.bat  # or ./all.bat for full tests
+```
