@@ -25,7 +25,7 @@ fi
 
 # Constants
 REPO_URL="https://github.com/Sudo-Ivan/go-no-telemetry.git"
-DEFAULT_BRANCH="no-telemetry-go1.24.10"
+DEFAULT_BRANCH="master"
 DEFAULT_INSTALL_DIR="/usr/local/go-no-telemetry"
 DEFAULT_SYSTEM_GO="/usr/bin/go"
 DEFAULT_SYSTEM_GOFMT="/usr/bin/gofmt"
@@ -261,8 +261,14 @@ install_system() {
         info "Installing toolchain binaries (compile, link, etc.)..."
         SYSTEM_TOOL_DIR="/usr/lib/go/pkg/tool/${GOOS}_${GOARCH}"
         $SUDO_CMD mkdir -p "$SYSTEM_TOOL_DIR"
-        $SUDO_CMD cp "$TOOL_DIR"/* "$SYSTEM_TOOL_DIR/"
-        $SUDO_CMD chmod +x "$SYSTEM_TOOL_DIR"/*
+        if [ -n "$(ls -A "$TOOL_DIR" 2>/dev/null)" ]; then
+            $SUDO_CMD cp "$TOOL_DIR"/* "$SYSTEM_TOOL_DIR/" || error "Failed to copy toolchain binaries"
+            if [ -n "$(ls -A "$SYSTEM_TOOL_DIR" 2>/dev/null)" ]; then
+                $SUDO_CMD chmod +x "$SYSTEM_TOOL_DIR"/*
+            fi
+        else
+            warning "Tool directory is empty: $TOOL_DIR"
+        fi
         
         info "Installing standard library source..."
         $SUDO_CMD cp -r "$REPO_DIR/src" /usr/lib/go/ 2>/dev/null || true
@@ -281,8 +287,14 @@ install_system() {
         info "Installing toolchain binaries (compile, link, etc.)..."
         CUSTOM_TOOL_DIR="$install_dir/pkg/tool/${GOOS}_${GOARCH}"
         $SUDO_CMD mkdir -p "$CUSTOM_TOOL_DIR"
-        $SUDO_CMD cp "$TOOL_DIR"/* "$CUSTOM_TOOL_DIR/"
-        $SUDO_CMD chmod +x "$CUSTOM_TOOL_DIR"/*
+        if [ -n "$(ls -A "$TOOL_DIR" 2>/dev/null)" ]; then
+            $SUDO_CMD cp "$TOOL_DIR"/* "$CUSTOM_TOOL_DIR/" || error "Failed to copy toolchain binaries"
+            if [ -n "$(ls -A "$CUSTOM_TOOL_DIR" 2>/dev/null)" ]; then
+                $SUDO_CMD chmod +x "$CUSTOM_TOOL_DIR"/*
+            fi
+        else
+            warning "Tool directory is empty: $TOOL_DIR"
+        fi
         
         info "Installing standard library source..."
         $SUDO_CMD cp -r "$REPO_DIR/src" "$install_dir/"
@@ -318,8 +330,14 @@ install_renamed() {
     info "Installing toolchain binaries (compile, link, etc.)..."
     CUSTOM_TOOL_DIR="$install_dir/pkg/tool/${GOOS}_${GOARCH}"
     $SUDO_CMD mkdir -p "$CUSTOM_TOOL_DIR"
-    $SUDO_CMD cp "$TOOL_DIR"/* "$CUSTOM_TOOL_DIR/"
-    $SUDO_CMD chmod +x "$CUSTOM_TOOL_DIR"/*
+    if [ -n "$(ls -A "$TOOL_DIR" 2>/dev/null)" ]; then
+        $SUDO_CMD cp "$TOOL_DIR"/* "$CUSTOM_TOOL_DIR/" || error "Failed to copy toolchain binaries"
+        if [ -n "$(ls -A "$CUSTOM_TOOL_DIR" 2>/dev/null)" ]; then
+            $SUDO_CMD chmod +x "$CUSTOM_TOOL_DIR"/*
+        fi
+    else
+        warning "Tool directory is empty: $TOOL_DIR"
+    fi
     
     info "Installing standard library source..."
     $SUDO_CMD cp -r "$REPO_DIR/src" "$install_dir/"
