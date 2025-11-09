@@ -283,6 +283,14 @@ cleanup() {
 
 trap cleanup EXIT
 
+read_input() {
+    if [ -t 0 ] && [ -t 1 ]; then
+        read -r "$@"
+    else
+        read -r "$@" < /dev/tty
+    fi
+}
+
 # Main menu
 main_menu() {
     printf "\n${BOLD}${CYAN}=== Go No Telemetry Installer ===${NC}\n\n"
@@ -305,7 +313,7 @@ main_menu() {
     printf "2) Build (with tests) and install\n"
     printf "3) Exit\n"
     printf "\nSelect option [1-3]: "
-    read -r choice
+    read_input choice
     
     case "$choice" in
         1)
@@ -334,13 +342,13 @@ install_menu() {
     printf "3) Install with renamed binaries\n"
     printf "4) Skip installation (build only)\n"
     printf "\nSelect option [1-4]: "
-    read -r install_choice
+    read_input install_choice
     
     case "$install_choice" in
         1)
             printf "\n${YELLOW}This will override your current Go installation.${NC}\n"
             printf "Continue? [y/N]: "
-            read -r confirm
+            read_input confirm
             if [ "$confirm" = "y" ] || [ "$confirm" = "Y" ]; then
                 install_system "" "yes"
             else
@@ -349,7 +357,7 @@ install_menu() {
             ;;
         2)
             printf "Enter installation directory [$DEFAULT_INSTALL_DIR]: "
-            read -r custom_dir
+            read_input custom_dir
             if [ -z "$custom_dir" ]; then
                 custom_dir="$DEFAULT_INSTALL_DIR"
             fi
@@ -357,17 +365,17 @@ install_menu() {
             ;;
         3)
             printf "Enter installation directory [$DEFAULT_INSTALL_DIR]: "
-            read -r custom_dir
+            read_input custom_dir
             if [ -z "$custom_dir" ]; then
                 custom_dir="$DEFAULT_INSTALL_DIR"
             fi
             printf "Enter name for 'go' binary [gotelemetry]: "
-            read -r go_name
+            read_input go_name
             if [ -z "$go_name" ]; then
                 go_name="gotelemetry"
             fi
             printf "Enter name for 'gofmt' binary [gofmttelemetry]: "
-            read -r gofmt_name
+            read_input gofmt_name
             if [ -z "$gofmt_name" ]; then
                 gofmt_name="gofmttelemetry"
             fi
