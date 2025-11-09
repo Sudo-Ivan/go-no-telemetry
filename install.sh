@@ -29,7 +29,6 @@ DEFAULT_INSTALL_DIR="/usr/local/go-no-telemetry"
 DEFAULT_SYSTEM_GO="/usr/bin/go"
 DEFAULT_SYSTEM_GOFMT="/usr/bin/gofmt"
 DEFAULT_SYSTEM_GO_DIR="/usr/lib/go/bin"
-TEMP_DIR="/tmp/go-no-telemetry-install-$$"
 MIN_GO_VERSION="1.22"
 
 # Error handling
@@ -151,17 +150,39 @@ check_bootstrap_go() {
 # Clone repository
 clone_repo() {
     if [ -d ".git" ]; then
-        info "Already in a git repository, skipping clone"
-        REPO_DIR="$(pwd)"
-        return 0
+        info "Already in a git repository, updating..."
+        if git pull --rebase; then
+            success "Repository updated"
+            REPO_DIR="$(pwd)"
+            return 0
+        else
+            warning "Failed to update repository, continuing with current state"
+            REPO_DIR="$(pwd)"
+            return 0
+        fi
     fi
     
-    info "Cloning repository..."
-    if ! git clone "$REPO_URL" "$TEMP_DIR"; then
+    if [ -d "go-no-telemetry" ] && [ -d "go-no-telemetry/.git" ]; then
+        info "Found existing repository in go-no-telemetry/, updating..."
+        cd go-no-telemetry
+        if git pull --rebase; then
+            success "Repository updated"
+            REPO_DIR="$(pwd)"
+            return 0
+        else
+            warning "Failed to update repository, continuing with current state"
+            REPO_DIR="$(pwd)"
+            return 0
+        fi
+    fi
+    
+    info "Cloning repository to current directory..."
+    if ! git clone "$REPO_URL" go-no-telemetry; then
         error "Failed to clone repository"
     fi
-    REPO_DIR="$TEMP_DIR"
-    cd "$REPO_DIR"
+    cd go-no-telemetry
+    REPO_DIR="$(pwd)"
+    success "Repository cloned"
 }
 
 # Build Go
@@ -275,10 +296,9 @@ add_to_path() {
 
 # Cleanup
 cleanup() {
-    if [ -n "$TEMP_DIR" ] && [ -d "$TEMP_DIR" ] && [ "$TEMP_DIR" != "$(pwd)" ]; then
-        info "Cleaning up temporary files..."
-        rm -rf "$TEMP_DIR"
-    fi
+    # Only cleanup temp dir if we created it (which we don't anymore)
+    # But keep this function for any future cleanup needs
+    :
 }
 
 trap cleanup EXIT
