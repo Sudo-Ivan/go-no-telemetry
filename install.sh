@@ -211,10 +211,27 @@ build_go() {
     success "Build completed successfully"
 }
 
+# Get GOOS and GOARCH from built Go
+get_go_platform() {
+    if [ ! -f "$REPO_DIR/bin/go" ]; then
+        error "Go binary not found. Build Go first."
+    fi
+    
+    GOOS=$("$REPO_DIR/bin/go" env GOOS)
+    GOARCH=$("$REPO_DIR/bin/go" env GOARCH)
+    TOOL_DIR="$REPO_DIR/pkg/tool/${GOOS}_${GOARCH}"
+    
+    if [ ! -d "$TOOL_DIR" ]; then
+        error "Tool directory not found: $TOOL_DIR"
+    fi
+}
+
 # Install to system location
 install_system() {
     local install_dir="$1"
     local override="$2"
+    
+    get_go_platform
     
     if [ "$override" = "yes" ]; then
         info "Installing to system location (overriding existing Go)..."
@@ -231,7 +248,14 @@ install_system() {
         $SUDO_CMD cp "$REPO_DIR/bin/gofmt" "$DEFAULT_SYSTEM_GO_DIR/gofmt"
         $SUDO_CMD chmod +x "$DEFAULT_SYSTEM_GO_DIR/go" "$DEFAULT_SYSTEM_GO_DIR/gofmt"
         
+        info "Installing toolchain binaries (compile, link, etc.)..."
+        SYSTEM_TOOL_DIR="/usr/lib/go/pkg/tool/${GOOS}_${GOARCH}"
+        $SUDO_CMD mkdir -p "$SYSTEM_TOOL_DIR"
+        $SUDO_CMD cp "$TOOL_DIR"/* "$SYSTEM_TOOL_DIR/"
+        $SUDO_CMD chmod +x "$SYSTEM_TOOL_DIR"/*
+        
         success "Installed to $DEFAULT_SYSTEM_GO_DIR"
+        success "Installed toolchain to $SYSTEM_TOOL_DIR"
     else
         info "Installing to custom directory: $install_dir"
         prompt_sudo
@@ -241,12 +265,20 @@ install_system() {
         $SUDO_CMD cp "$REPO_DIR/bin/gofmt" "$install_dir/bin/"
         $SUDO_CMD chmod +x "$install_dir/bin/go" "$install_dir/bin/gofmt"
         
+        info "Installing toolchain binaries (compile, link, etc.)..."
+        CUSTOM_TOOL_DIR="$install_dir/pkg/tool/${GOOS}_${GOARCH}"
+        $SUDO_CMD mkdir -p "$CUSTOM_TOOL_DIR"
+        $SUDO_CMD cp "$TOOL_DIR"/* "$CUSTOM_TOOL_DIR/"
+        $SUDO_CMD chmod +x "$CUSTOM_TOOL_DIR"/*
+        
         detect_shell_config
         add_to_path "$install_dir/bin"
         
         success "Installed to $install_dir/bin"
+        success "Installed toolchain to $CUSTOM_TOOL_DIR"
         info "Added to PATH in $SHELL_CONFIG"
         printf "${YELLOW}Please run: source $SHELL_CONFIG${NC}\n"
+        printf "${CYAN}Set GOROOT=$install_dir if needed${NC}\n"
     fi
 }
 
@@ -256,6 +288,8 @@ install_renamed() {
     local go_name="$2"
     local gofmt_name="$3"
     
+    get_go_platform
+    
     info "Installing with renamed binaries..."
     prompt_sudo
     
@@ -264,13 +298,21 @@ install_renamed() {
     $SUDO_CMD cp "$REPO_DIR/bin/gofmt" "$install_dir/bin/$gofmt_name"
     $SUDO_CMD chmod +x "$install_dir/bin/$go_name" "$install_dir/bin/$gofmt_name"
     
+    info "Installing toolchain binaries (compile, link, etc.)..."
+    CUSTOM_TOOL_DIR="$install_dir/pkg/tool/${GOOS}_${GOARCH}"
+    $SUDO_CMD mkdir -p "$CUSTOM_TOOL_DIR"
+    $SUDO_CMD cp "$TOOL_DIR"/* "$CUSTOM_TOOL_DIR/"
+    $SUDO_CMD chmod +x "$CUSTOM_TOOL_DIR"/*
+    
     detect_shell_config
     add_to_path "$install_dir/bin"
     
     success "Installed as $go_name and $gofmt_name"
+    success "Installed toolchain to $CUSTOM_TOOL_DIR"
     info "Added to PATH in $SHELL_CONFIG"
     printf "${YELLOW}Please run: source $SHELL_CONFIG${NC}\n"
     printf "${CYAN}Use: $go_name version${NC}\n"
+    printf "${CYAN}Set GOROOT=$install_dir if needed${NC}\n"
 }
 
 # Add to PATH in shell config
