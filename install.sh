@@ -25,6 +25,7 @@ fi
 
 # Constants
 REPO_URL="https://github.com/Sudo-Ivan/go-no-telemetry.git"
+DEFAULT_BRANCH="master"
 DEFAULT_INSTALL_DIR="/usr/local/go-no-telemetry"
 DEFAULT_SYSTEM_GO="/usr/bin/go"
 DEFAULT_SYSTEM_GOFMT="/usr/bin/gofmt"
@@ -149,6 +150,8 @@ check_bootstrap_go() {
 
 # Clone repository
 clone_repo() {
+    local branch="$1"
+
     if [ -d ".git" ]; then
         info "Already in a git repository, updating..."
         if git pull --rebase; then
@@ -161,7 +164,7 @@ clone_repo() {
             return 0
         fi
     fi
-    
+
     if [ -d "go-no-telemetry" ] && [ -d "go-no-telemetry/.git" ]; then
         info "Found existing repository in go-no-telemetry/, updating..."
         cd go-no-telemetry
@@ -175,10 +178,17 @@ clone_repo() {
             return 0
         fi
     fi
-    
+
     info "Cloning repository to current directory..."
-    if ! git clone "$REPO_URL" go-no-telemetry; then
-        error "Failed to clone repository"
+    if [ -n "$branch" ] && [ "$branch" != "$DEFAULT_BRANCH" ]; then
+        info "Using branch: $branch"
+        if ! git clone --branch "$branch" "$REPO_URL" go-no-telemetry; then
+            error "Failed to clone repository branch $branch"
+        fi
+    else
+        if ! git clone "$REPO_URL" go-no-telemetry; then
+            error "Failed to clone repository"
+        fi
     fi
     cd go-no-telemetry
     REPO_DIR="$(pwd)"
@@ -251,8 +261,14 @@ install_system() {
         info "Installing toolchain binaries (compile, link, etc.)..."
         SYSTEM_TOOL_DIR="/usr/lib/go/pkg/tool/${GOOS}_${GOARCH}"
         $SUDO_CMD mkdir -p "$SYSTEM_TOOL_DIR"
-        $SUDO_CMD cp "$TOOL_DIR"/* "$SYSTEM_TOOL_DIR/"
-        $SUDO_CMD chmod +x "$SYSTEM_TOOL_DIR"/*
+        if [ -n "$(ls -A "$TOOL_DIR" 2>/dev/null)" ]; then
+            $SUDO_CMD cp "$TOOL_DIR"/* "$SYSTEM_TOOL_DIR/" || error "Failed to copy toolchain binaries"
+            if [ -n "$(ls -A "$SYSTEM_TOOL_DIR" 2>/dev/null)" ]; then
+                $SUDO_CMD chmod +x "$SYSTEM_TOOL_DIR"/*
+            fi
+        else
+            warning "Tool directory is empty: $TOOL_DIR"
+        fi
         
         info "Installing standard library source..."
         $SUDO_CMD cp -r "$REPO_DIR/src" /usr/lib/go/ 2>/dev/null || true
@@ -271,8 +287,14 @@ install_system() {
         info "Installing toolchain binaries (compile, link, etc.)..."
         CUSTOM_TOOL_DIR="$install_dir/pkg/tool/${GOOS}_${GOARCH}"
         $SUDO_CMD mkdir -p "$CUSTOM_TOOL_DIR"
-        $SUDO_CMD cp "$TOOL_DIR"/* "$CUSTOM_TOOL_DIR/"
-        $SUDO_CMD chmod +x "$CUSTOM_TOOL_DIR"/*
+        if [ -n "$(ls -A "$TOOL_DIR" 2>/dev/null)" ]; then
+            $SUDO_CMD cp "$TOOL_DIR"/* "$CUSTOM_TOOL_DIR/" || error "Failed to copy toolchain binaries"
+            if [ -n "$(ls -A "$CUSTOM_TOOL_DIR" 2>/dev/null)" ]; then
+                $SUDO_CMD chmod +x "$CUSTOM_TOOL_DIR"/*
+            fi
+        else
+            warning "Tool directory is empty: $TOOL_DIR"
+        fi
         
         info "Installing standard library source..."
         $SUDO_CMD cp -r "$REPO_DIR/src" "$install_dir/"
@@ -308,8 +330,14 @@ install_renamed() {
     info "Installing toolchain binaries (compile, link, etc.)..."
     CUSTOM_TOOL_DIR="$install_dir/pkg/tool/${GOOS}_${GOARCH}"
     $SUDO_CMD mkdir -p "$CUSTOM_TOOL_DIR"
-    $SUDO_CMD cp "$TOOL_DIR"/* "$CUSTOM_TOOL_DIR/"
-    $SUDO_CMD chmod +x "$CUSTOM_TOOL_DIR"/*
+    if [ -n "$(ls -A "$TOOL_DIR" 2>/dev/null)" ]; then
+        $SUDO_CMD cp "$TOOL_DIR"/* "$CUSTOM_TOOL_DIR/" || error "Failed to copy toolchain binaries"
+        if [ -n "$(ls -A "$CUSTOM_TOOL_DIR" 2>/dev/null)" ]; then
+            $SUDO_CMD chmod +x "$CUSTOM_TOOL_DIR"/*
+        fi
+    else
+        warning "Tool directory is empty: $TOOL_DIR"
+    fi
     
     info "Installing standard library source..."
     $SUDO_CMD cp -r "$REPO_DIR/src" "$install_dir/"
@@ -367,20 +395,47 @@ read_input() {
 # Main menu
 main_menu() {
     printf "\n${BOLD}${CYAN}=== Go No Telemetry Installer ===${NC}\n\n"
-    
+
     check_command git
     check_command gcc
     check_bootstrap_go
     detect_sudo
-    
+
     if ! check_root; then
         info "Running as regular user (will use $SUDO_CMD when needed)"
     else
         info "Running as root"
     fi
-    
-    clone_repo
-    
+
+    # Branch selection
+    printf "\n${BOLD}Available Branches:${NC}\n"
+    printf "1) master (latest development version)\n"
+    printf "2) no-telemetry-go1.24.10 (stable go1.24.10)\n"
+    printf "3) Custom branch\n"
+    printf "\nSelect branch [1-3]: "
+    read_input branch_choice
+
+    case "$branch_choice" in
+        1)
+            BRANCH="$DEFAULT_BRANCH"
+            ;;
+        2)
+            BRANCH="no-telemetry-go1.24.10"
+            ;;
+        3)
+            printf "Enter branch name: "
+            read_input BRANCH
+            if [ -z "$BRANCH" ]; then
+                BRANCH="$DEFAULT_BRANCH"
+            fi
+            ;;
+        *)
+            BRANCH="$DEFAULT_BRANCH"
+            ;;
+    esac
+
+    clone_repo "$BRANCH"
+
     printf "\n${BOLD}Installation Options:${NC}\n"
     printf "1) Build (without tests) and install\n"
     printf "2) Build (with tests) and install\n"
@@ -471,4 +526,3 @@ install_menu() {
 
 # Run main
 main_menu
-
