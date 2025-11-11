@@ -26,5 +26,4 @@ src/cmd/go.mod merge=ours
 src/cmd/go.sum merge=ours
 src/cmd/go/script_test.go merge=ours
 src/cmd/vendor/modules.txt merge=ours
-install.sh merge=ours
 README.md merge=ours
