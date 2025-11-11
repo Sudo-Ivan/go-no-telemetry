@@ -11,6 +11,9 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
+    env:
+      NTFY_INSTANCE: ${{ secrets.NTFY_INSTANCE }}
+      NTFY_ROOM: ${{ secrets.NTFY_ROOM }}
     
     strategy:
       matrix:
@@ -103,12 +106,39 @@ jobs:
         name: go-source
         path: pkg/distpack/*.src.tar.gz
         retention-days: 7
+    
+    - name: Notify build success
+      if: success()
+      run: |
+        ARM_SUFFIX=""
+        if [ -n "${{ matrix.goarm }}" ]; then
+          ARM_SUFFIX=" v${{ matrix.goarm }}"
+        fi
+        curl -H "Title: Build Success: ${{ matrix.goos }}/${{ matrix.goarch }}$ARM_SUFFIX" \
+          -H "Priority: low" \
+          -d "Build completed successfully for ${{ matrix.goos }}/${{ matrix.goarch }}$ARM_SUFFIX" \
+          "$NTFY_INSTANCE/$NTFY_ROOM"
+    
+    - name: Notify build failure
+      if: failure()
+      run: |
+        ARM_SUFFIX=""
+        if [ -n "${{ matrix.goarm }}" ]; then
+          ARM_SUFFIX=" v${{ matrix.goarm }}"
+        fi
+        curl -H "Title: Build Failed: ${{ matrix.goos }}/${{ matrix.goarch }}$ARM_SUFFIX" \
+          -H "Priority: high" \
+          -d "Build failed for ${{ matrix.goos }}/${{ matrix.goarch }}$ARM_SUFFIX" \
+          "$NTFY_INSTANCE/$NTFY_ROOM"
 
   release:
     needs: build
     runs-on: ubuntu-latest
     permissions:
       contents: write
+    env:
+      NTFY_INSTANCE: ${{ secrets.NTFY_INSTANCE }}
+      NTFY_ROOM: ${{ secrets.NTFY_ROOM }}
     
     steps:
     - name: Checkout code
@@ -148,4 +178,20 @@ jobs:
           go-netbsd-amd64/*.*
           go-netbsd-arm64/*.*
           go-source/*.*
+    
+    - name: Notify release success
+      if: success()
+      run: |
+        curl -H "Title: Release Created: ${{ steps.version.outputs.version }}" \
+          -H "Priority: default" \
+          -d "Draft release created for version ${{ steps.version.outputs.version }}" \
+          "$NTFY_INSTANCE/$NTFY_ROOM"
+    
+    - name: Notify release failure
+      if: failure()
+      run: |
+        curl -H "Title: Release Failed" \
+          -H "Priority: high" \
+          -d "Failed to create release for version ${{ steps.version.outputs.version }}" \
+          "$NTFY_INSTANCE/$NTFY_ROOM"
 

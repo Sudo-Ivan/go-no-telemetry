@@ -11,6 +11,9 @@ jobs:
     permissions:
       contents: write
       pull-requests: write
+    env:
+      NTFY_INSTANCE: ${{ secrets.NTFY_INSTANCE }}
+      NTFY_ROOM: ${{ secrets.NTFY_ROOM }}
     
     steps:
     - name: Checkout repository
@@ -49,6 +52,7 @@ jobs:
     
     - name: Create Pull Request
       if: steps.check.outputs.has_changes == 'true'
+      id: pr
       uses: peter-evans/create-pull-request@v5
       with:
         token: ${{ secrets.GITHUB_TOKEN }}
@@ -65,4 +69,38 @@ jobs:
           upstream-sync
           automated
         delete-branch: true
+    
+    - name: Notify PR created
+      if: steps.check.outputs.has_changes == 'true' && steps.pr.outputs.pull-request-number != ''
+      run: |
+        PR_URL="${{ steps.pr.outputs.pull-request-url }}"
+        curl -H "Title: New PR: Sync upstream Go changes" \
+          -H "Priority: default" \
+          -H "Click: $PR_URL" \
+          -d "New pull request created for upstream sync: $PR_URL" \
+          "$NTFY_INSTANCE/$NTFY_ROOM"
+    
+    - name: Notify sync success
+      if: success() && steps.check.outputs.has_changes == 'false'
+      run: |
+        curl -H "Title: Sync Upstream: No changes" \
+          -H "Priority: low" \
+          -d "Upstream sync completed - no new changes found" \
+          "$NTFY_INSTANCE/$NTFY_ROOM"
+    
+    - name: Notify sync success with changes
+      if: success() && steps.check.outputs.has_changes == 'true'
+      run: |
+        curl -H "Title: Sync Upstream: Changes merged" \
+          -H "Priority: default" \
+          -d "Upstream changes merged and PR created successfully" \
+          "$NTFY_INSTANCE/$NTFY_ROOM"
+    
+    - name: Notify sync failure
+      if: failure()
+      run: |
+        curl -H "Title: Sync Upstream Failed" \
+          -H "Priority: high" \
+          -d "Failed to sync upstream changes from go.googlesource.com/go" \
+          "$NTFY_INSTANCE/$NTFY_ROOM"
 
