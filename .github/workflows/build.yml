@@ -1,0 +1,151 @@
+name: Build and Release
+
+on:
+  push:
+    tags:
+      - '*'
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    
+    strategy:
+      matrix:
+        include:
+          - goos: linux
+            goarch: amd64
+          - goos: linux
+            goarch: arm64
+          - goos: linux
+            goarch: 386
+          - goos: linux
+            goarch: arm
+            goarm: 6
+          - goos: linux
+            goarch: arm
+            goarm: 7
+          - goos: darwin
+            goarch: amd64
+          - goos: darwin
+            goarch: arm64
+          - goos: windows
+            goarch: amd64
+          - goos: windows
+            goarch: arm64
+          - goos: windows
+            goarch: 386
+          - goos: freebsd
+            goarch: amd64
+          - goos: freebsd
+            goarch: arm64
+          - goos: openbsd
+            goarch: amd64
+          - goos: openbsd
+            goarch: arm64
+          - goos: netbsd
+            goarch: amd64
+          - goos: netbsd
+            goarch: arm64
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v5
+    
+    - name: Set up Go (bootstrap)
+      uses: actions/setup-go@v5
+      with:
+        go-version: '1.25'
+    
+    - name: Install dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y gcc git
+    
+    - name: Build Go
+      working-directory: src
+      env:
+        GOOS: ${{ matrix.goos }}
+        GOARCH: ${{ matrix.goarch }}
+        GOARM: ${{ matrix.goarm }}
+      run: ./make.bash -distpack
+    
+    - name: Read version
+      id: version
+      run: |
+        VERSION=$(head -n1 ../VERSION | tr -d '\n')
+        echo "version=$VERSION" >> $GITHUB_OUTPUT
+        echo "Version: $VERSION"
+    
+    - name: Set artifact name
+      id: artifact
+      run: |
+        if [ -n "${{ matrix.goarm }}" ]; then
+          echo "name=go-${{ matrix.goos }}-${{ matrix.goarch }}-v${{ matrix.goarm }}" >> $GITHUB_OUTPUT
+        else
+          echo "name=go-${{ matrix.goos }}-${{ matrix.goarch }}" >> $GITHUB_OUTPUT
+        fi
+    
+    - name: Upload artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: ${{ steps.artifact.outputs.name }}
+        path: |
+          pkg/distpack/*.${{ matrix.goos }}-${{ matrix.goarch }}.*
+        retention-days: 7
+    
+    - name: Upload source artifact (once)
+      if: matrix.goos == 'linux' && matrix.goarch == 'amd64'
+      uses: actions/upload-artifact@v4
+      with:
+        name: go-source
+        path: pkg/distpack/*.src.tar.gz
+        retention-days: 7
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v5
+    
+    - name: Read version
+      id: version
+      run: |
+        VERSION=$(head -n1 VERSION | tr -d '\n')
+        echo "version=$VERSION" >> $GITHUB_OUTPUT
+        echo "Version: $VERSION"
+    
+    - name: Download all artifacts
+      uses: actions/download-artifact@v4
+    
+    - name: Create draft release
+      uses: softprops/action-gh-release@v1
+      with:
+        tag_name: ${{ steps.version.outputs.version }}
+        name: ${{ steps.version.outputs.version }}
+        draft: true
+        files: |
+          go-linux-amd64/*.*
+          go-linux-arm64/*.*
+          go-linux-arm-v6/*.*
+          go-linux-arm-v7/*.*
+          go-linux-386/*.*
+          go-darwin-amd64/*.*
+          go-darwin-arm64/*.*
+          go-windows-amd64/*.*
+          go-windows-arm64/*.*
+          go-windows-386/*.*
+          go-freebsd-amd64/*.*
+          go-freebsd-arm64/*.*
+          go-openbsd-amd64/*.*
+          go-openbsd-arm64/*.*
+          go-netbsd-amd64/*.*
+          go-netbsd-arm64/*.*
+          go-source/*.*
+
