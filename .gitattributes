@@ -19,5 +19,12 @@
 src/cmd/go/internal/telemetrycmd/telemetry.go merge=ours
 src/cmd/internal/telemetry/telemetry.go merge=ours
 src/cmd/internal/telemetry/telemetry_bootstrap.go merge=ours
+src/cmd/internal/telemetry/counter/counter.go merge=ours
 src/cmd/go/internal/telemetrystats/telemetrystats.go merge=ours
 src/cmd/go/internal/telemetrystats/telemetrystats_bootstrap.go merge=ours
+src/cmd/go.mod merge=ours
+src/cmd/go.sum merge=ours
+src/cmd/go/script_test.go merge=ours
+src/cmd/vendor/modules.txt merge=ours
+install.sh merge=ours
+README.md merge=ours
