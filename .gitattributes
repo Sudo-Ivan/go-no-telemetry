@@ -14,3 +14,10 @@
 # See golang.org/issue/9281.
 
 * -text
+
+# Telemetry files - always prefer our version during merges
+src/cmd/go/internal/telemetrycmd/telemetry.go merge=ours
+src/cmd/internal/telemetry/telemetry.go merge=ours
+src/cmd/internal/telemetry/telemetry_bootstrap.go merge=ours
+src/cmd/go/internal/telemetrystats/telemetrystats.go merge=ours
+src/cmd/go/internal/telemetrystats/telemetrystats_bootstrap.go merge=ours
