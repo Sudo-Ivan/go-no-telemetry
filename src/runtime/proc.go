@@ -849,6 +849,8 @@ func schedinit() {
 
 	lockVerifyMSize()
 
+	sched.midle.init(unsafe.Offsetof(m{}.idleNode))
+
 	// raceinit must be the first call to race detector.
 	// In particular, it must be done before mallocinit below calls racemapshadow.
 	gp := getg()
@@ -1006,6 +1008,8 @@ func mcommoninit(mp *m, id int64) {
 	} else {
 		mp.id = mReserveID()
 	}
+
+	mp.self = newMWeakPointer(mp)
 
 	mrandinit(mp)
 
@@ -2015,6 +2019,10 @@ func mexit(osStack bool) {
 
 	// Free vgetrandom state.
 	vgetrandomDestroy(mp)
+
+	// Clear the self pointer so Ps don't access this M after it is freed,
+	// or keep it alive.
+	mp.self.clear()
 
 	// Remove m from allm.
 	lock(&sched.lock)
@@ -4257,6 +4265,7 @@ func park_m(gp *g) {
 }
 
 func goschedImpl(gp *g, preempted bool) {
+	pp := gp.m.p.ptr()
 	trace := traceAcquire()
 	status := readgstatus(gp)
 	if status&^_Gscan != _Grunning {
@@ -4279,9 +4288,15 @@ func goschedImpl(gp *g, preempted bool) {
 	}
 
 	dropg()
-	lock(&sched.lock)
-	globrunqput(gp)
-	unlock(&sched.lock)
+	if preempted && sched.gcwaiting.Load() {
+		// If preempted for STW, keep the G on the local P in runnext
+		// so it can keep running immediately after the STW.
+		runqput(pp, gp, true)
+	} else {
+		lock(&sched.lock)
+		globrunqput(gp)
+		unlock(&sched.lock)
+	}
 
 	if mainStarted {
 		wakep()
@@ -6011,6 +6026,7 @@ func procresize(nprocs int32) *p {
 	}
 
 	var runnablePs *p
+	var runnablePsNeedM *p
 	for i := nprocs - 1; i >= 0; i-- {
 		pp := allp[i]
 		if gp.m.p.ptr() == pp {
@@ -6019,12 +6035,41 @@ func procresize(nprocs int32) *p {
 		pp.status = _Pidle
 		if runqempty(pp) {
 			pidleput(pp, now)
-		} else {
-			pp.m.set(mget())
-			pp.link.set(runnablePs)
-			runnablePs = pp
+			continue
 		}
+
+		// Prefer to run on the most recent M if it is
+		// available.
+		//
+		// Ps with no oldm (or for which oldm is already taken
+		// by an earlier P), we delay until all oldm Ps are
+		// handled. Otherwise, mget may return an M that a
+		// later P has in oldm.
+		var mp *m
+		if oldm := pp.oldm.get(); oldm != nil {
+			// Returns nil if oldm is not idle.
+			mp = mgetSpecific(oldm)
+		}
+		if mp == nil {
+			// Call mget later.
+			pp.link.set(runnablePsNeedM)
+			runnablePsNeedM = pp
+			continue
+		}
+		pp.m.set(mp)
+		pp.link.set(runnablePs)
+		runnablePs = pp
 	}
+	for runnablePsNeedM != nil {
+		pp := runnablePsNeedM
+		runnablePsNeedM = pp.link.ptr()
+
+		mp := mget()
+		pp.m.set(mp)
+		pp.link.set(runnablePs)
+		runnablePs = pp
+	}
+
 	stealOrder.reset(uint32(nprocs))
 	var int32p *int32 = &gomaxprocs // make compiler check that gomaxprocs is an int32
 	atomic.Store((*uint32)(unsafe.Pointer(int32p)), uint32(nprocs))
@@ -6061,6 +6106,11 @@ func acquirepNoTrace(pp *p) {
 	wirep(pp)
 
 	// Have p; write barriers now allowed.
+
+	// The M we're associating with will be the old M after the next
+	// releasep. We must set this here because write barriers are not
+	// allowed in releasep.
+	pp.oldm = pp.m.ptr().self
 
 	// Perform deferred mcache flush before this P can allocate
 	// from a potentially stale mcache.
@@ -6976,8 +7026,7 @@ func schedEnabled(gp *g) bool {
 func mput(mp *m) {
 	assertLockHeld(&sched.lock)
 
-	mp.schedlink = sched.midle
-	sched.midle.set(mp)
+	sched.midle.push(unsafe.Pointer(mp))
 	sched.nmidle++
 	checkdead()
 }
@@ -6990,11 +7039,31 @@ func mput(mp *m) {
 func mget() *m {
 	assertLockHeld(&sched.lock)
 
-	mp := sched.midle.ptr()
+	mp := (*m)(sched.midle.pop())
 	if mp != nil {
-		sched.midle = mp.schedlink
 		sched.nmidle--
 	}
+	return mp
+}
+
+// Try to get a specific m from midle list. Returns nil if it isn't on the
+// midle list.
+//
+// sched.lock must be held.
+// May run during STW, so write barriers are not allowed.
+//
+//go:nowritebarrierrec
+func mgetSpecific(mp *m) *m {
+	assertLockHeld(&sched.lock)
+
+	if mp.idleNode.prev == 0 && mp.idleNode.next == 0 {
+		// Not on the list.
+		return nil
+	}
+
+	sched.midle.remove(unsafe.Pointer(mp))
+	sched.nmidle--
+
 	return mp
 }
 
