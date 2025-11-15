@@ -10,7 +10,7 @@ require (
 	golang.org/x/sync v0.17.0
 	golang.org/x/sys v0.37.0
 	golang.org/x/term v0.34.0
-	golang.org/x/tools v0.38.1-0.20251015192825-7d9453ccc0f5
+	golang.org/x/tools v0.39.1-0.20251114194111-59ff18ce4883
 )
 
 require (
