@@ -87,7 +87,7 @@ const DefaultMaxIdleConnsPerHost = 2
 // ClientTrace.Got1xxResponse.
 //
 // Transport only retries a request upon encountering a network error
-// if the connection has been already been used successfully and if the
+// if the connection has already been used successfully and if the
 // request is idempotent and either has no body or has its [Request.GetBody]
 // defined. HTTP requests are considered idempotent if they have HTTP methods
 // GET, HEAD, OPTIONS, or TRACE; or if their [Header] map contains an
@@ -2110,7 +2110,6 @@ type persistConn struct {
 	numExpectedResponses int
 	closed               error // set non-nil when conn is closed, before closech is closed
 	canceledErr          error // set non-nil if conn is canceled
-	broken               bool  // an error has happened on this connection; marked broken so it's not reused.
 	reused               bool  // whether conn has had successful request/response and is being reused.
 	// mutateHeaderFunc is an optional func to modify extra
 	// headers on each outbound request before it's written. (the
@@ -2925,7 +2924,6 @@ func (pc *persistConn) closeLocked(err error) {
 	if err == nil {
 		panic("nil error")
 	}
-	pc.broken = true
 	if pc.closed == nil {
 		pc.closed = err
 		pc.t.decConnsPerHost(pc.cacheKey)

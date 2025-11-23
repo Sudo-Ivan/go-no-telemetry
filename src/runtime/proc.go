@@ -3119,7 +3119,7 @@ func startm(pp *p, spinning, lockheld bool) {
 //go:nowritebarrierrec
 func handoffp(pp *p) {
 	// handoffp must start an M in any situation where
-	// findrunnable would return a G to run on pp.
+	// findRunnable would return a G to run on pp.
 
 	// if it has local work, start it straight away
 	if !runqempty(pp) || !sched.runq.empty() {
@@ -3362,7 +3362,7 @@ func findRunnable() (gp *g, inheritTime, tryWakeP bool) {
 	mp := getg().m
 
 	// The conditions here and in handoffp must agree: if
-	// findrunnable would return a G to run, handoffp must start
+	// findRunnable would return a G to run, handoffp must start
 	// an M.
 
 top:
@@ -3586,7 +3586,7 @@ top:
 		goto top
 	}
 	if releasep() != pp {
-		throw("findrunnable: wrong p")
+		throw("findRunnable: wrong p")
 	}
 	now = pidleput(pp, now)
 	unlock(&sched.lock)
@@ -3631,7 +3631,7 @@ top:
 	if mp.spinning {
 		mp.spinning = false
 		if sched.nmspinning.Add(-1) < 0 {
-			throw("findrunnable: negative nmspinning")
+			throw("findRunnable: negative nmspinning")
 		}
 
 		// Note the for correctness, only the last M transitioning from
@@ -3704,10 +3704,10 @@ top:
 	if netpollinited() && (netpollAnyWaiters() || pollUntil != 0) && sched.lastpoll.Swap(0) != 0 {
 		sched.pollUntil.Store(pollUntil)
 		if mp.p != 0 {
-			throw("findrunnable: netpoll with p")
+			throw("findRunnable: netpoll with p")
 		}
 		if mp.spinning {
-			throw("findrunnable: netpoll with spinning")
+			throw("findRunnable: netpoll with spinning")
 		}
 		delay := int64(-1)
 		if pollUntil != 0 {
@@ -3973,7 +3973,7 @@ func checkIdleGCNoP() (*p, *g) {
 // timers and the network poller if there isn't one already.
 func wakeNetPoller(when int64) {
 	if sched.lastpoll.Load() == 0 {
-		// In findrunnable we ensure that when polling the pollUntil
+		// In findRunnable we ensure that when polling the pollUntil
 		// field is either zero or the time to which the current
 		// poll is expected to run. This can have a spurious wakeup
 		// but should never miss a wakeup.
@@ -3998,7 +3998,7 @@ func resetspinning() {
 	gp.m.spinning = false
 	nmspinning := sched.nmspinning.Add(-1)
 	if nmspinning < 0 {
-		throw("findrunnable: negative nmspinning")
+		throw("findRunnable: negative nmspinning")
 	}
 	// M wakeup policy is deliberately somewhat conservative, so check if we
 	// need to wakeup another P here. See "Worker thread parking/unparking"
@@ -4135,10 +4135,22 @@ top:
 
 	gp, inheritTime, tryWakeP := findRunnable() // blocks until work is available
 
+	// May be on a new P.
+	pp = mp.p.ptr()
+
 	// findRunnable may have collected an allp snapshot. The snapshot is
 	// only required within findRunnable. Clear it to all GC to collect the
 	// slice.
 	mp.clearAllpSnapshot()
+
+	// If the P was assigned a next GC mark worker but findRunnable
+	// selected anything else, release the worker so another P may run it.
+	//
+	// N.B. If this occurs because a higher-priority goroutine was selected
+	// (trace reader), then tryWakeP is set, which will wake another P to
+	// run the worker. If this occurs because the GC is no longer active,
+	// there is no need to wakep.
+	gcController.releaseNextGCMarkWorker(pp)
 
 	if debug.dontfreezetheworld > 0 && freezing.Load() {
 		// See comment in freezetheworld. We don't want to perturb
@@ -6036,8 +6048,10 @@ func procresize(nprocs int32) *p {
 		unlock(&allpLock)
 	}
 
+	// Assign Ms to Ps with runnable goroutines.
 	var runnablePs *p
 	var runnablePsNeedM *p
+	var idlePs *p
 	for i := nprocs - 1; i >= 0; i-- {
 		pp := allp[i]
 		if gp.m.p.ptr() == pp {
@@ -6045,7 +6059,8 @@ func procresize(nprocs int32) *p {
 		}
 		pp.status = _Pidle
 		if runqempty(pp) {
-			pidleput(pp, now)
+			pp.link.set(idlePs)
+			idlePs = pp
 			continue
 		}
 
@@ -6071,6 +6086,8 @@ func procresize(nprocs int32) *p {
 		pp.link.set(runnablePs)
 		runnablePs = pp
 	}
+	// Assign Ms to remaining runnable Ps without usable oldm. See comment
+	// above.
 	for runnablePsNeedM != nil {
 		pp := runnablePsNeedM
 		runnablePsNeedM = pp.link.ptr()
@@ -6079,6 +6096,62 @@ func procresize(nprocs int32) *p {
 		pp.m.set(mp)
 		pp.link.set(runnablePs)
 		runnablePs = pp
+	}
+
+	// Now that we've assigned Ms to Ps with runnable goroutines, assign GC
+	// mark workers to remaining idle Ps, if needed.
+	//
+	// By assigning GC workers to Ps here, we slightly speed up starting
+	// the world, as we will start enough Ps to run all of the user
+	// goroutines and GC mark workers all at once, rather than using a
+	// sequence of wakep calls as each P's findRunnable realizes it needs
+	// to run a mark worker instead of a user goroutine.
+	//
+	// By assigning GC workers to Ps only _after_ previously-running Ps are
+	// assigned Ms, we ensure that goroutines previously running on a P
+	// continue to run on the same P, with GC mark workers preferring
+	// previously-idle Ps. This helps prevent goroutines from shuffling
+	// around too much across STW.
+	//
+	// N.B., if there aren't enough Ps left in idlePs for all of the GC
+	// mark workers, then findRunnable will still choose to run mark
+	// workers on Ps assigned above.
+	//
+	// N.B., we do this during any STW in the mark phase, not just the
+	// sweep termination STW that starts the mark phase. gcBgMarkWorker
+	// always preempts by removing itself from the P, so even unrelated
+	// STWs during the mark require that Ps reselect mark workers upon
+	// restart.
+	if gcBlackenEnabled != 0 {
+		for idlePs != nil {
+			pp := idlePs
+
+			ok, _ := gcController.assignWaitingGCWorker(pp, now)
+			if !ok {
+				// No more mark workers needed.
+				break
+			}
+
+			// Got a worker, P is now runnable.
+			//
+			// mget may return nil if there aren't enough Ms, in
+			// which case startTheWorldWithSema will start one.
+			//
+			// N.B. findRunnableGCWorker will make the worker G
+			// itself runnable.
+			idlePs = pp.link.ptr()
+			mp := mget()
+			pp.m.set(mp)
+			pp.link.set(runnablePs)
+			runnablePs = pp
+		}
+	}
+
+	// Finally, any remaining Ps are truly idle.
+	for idlePs != nil {
+		pp := idlePs
+		idlePs = pp.link.ptr()
+		pidleput(pp, now)
 	}
 
 	stealOrder.reset(uint32(nprocs))
@@ -6183,6 +6256,10 @@ func releasepNoTrace() *p {
 		print("releasep: m=", gp.m, " m->p=", gp.m.p.ptr(), " p->m=", hex(pp.m), " p->status=", pp.status, "\n")
 		throw("releasep: invalid p state")
 	}
+
+	// P must clear if nextGCMarkWorker if it stops.
+	gcController.releaseNextGCMarkWorker(pp)
+
 	gp.m.p = 0
 	pp.m = 0
 	pp.status = _Pidle
@@ -7269,7 +7346,7 @@ func pidlegetSpinning(now int64) (*p, int64) {
 
 	pp, now := pidleget(now)
 	if pp == nil {
-		// See "Delicate dance" comment in findrunnable. We found work
+		// See "Delicate dance" comment in findRunnable. We found work
 		// that we cannot take, we must synchronize with non-spinning
 		// Ms that may be preparing to drop their P.
 		sched.needspinning.Store(1)
