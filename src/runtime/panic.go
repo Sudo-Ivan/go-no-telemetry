@@ -739,7 +739,7 @@ func printpanics(p *_panic) {
 	}
 	print("panic: ")
 	printpanicval(p.arg)
-	if p.repanicked {
+	if p.recovered && p.repanicked {
 		print(" [recovered, repanicked]")
 	} else if p.recovered {
 		print(" [recovered]")
@@ -793,10 +793,7 @@ var panicnil = &godebugInc{name: "panicnil"}
 // The compiler emits calls to this function.
 //
 // gopanic should be an internal detail,
-// but widely used packages access it using linkname.
-// Notable members of the hall of shame include:
-//   - go.undefinedlabs.com/scopeagent
-//   - github.com/goplus/igop
+// but historically, widely used packages access it using linkname.
 //
 // Do not remove or change the type signature.
 // See go.dev/issue/67401.

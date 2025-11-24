@@ -335,6 +335,7 @@ var depsRules = `
 	< internal/gover
 	< go/version
 	< go/token
+	< go/internal/scannerhooks
 	< go/scanner
 	< go/ast
 	< go/internal/typeparams;
@@ -517,6 +518,7 @@ var depsRules = `
 	< crypto/internal/fips140/aes/gcm
 	< crypto/internal/fips140/hkdf
 	< crypto/internal/fips140/mlkem
+	< crypto/internal/fips140/mldsa
 	< crypto/internal/fips140/ssh
 	< crypto/internal/fips140/tls12
 	< crypto/internal/fips140/tls13
@@ -729,6 +731,9 @@ var depsRules = `
 
 	testing
 	< internal/testhash;
+
+	CRYPTO-MATH
+	< crypto/mlkem/mlkemtest;
 
 	CRYPTO-MATH, testing, internal/testenv, internal/testhash, encoding/json
 	< crypto/internal/cryptotest;
