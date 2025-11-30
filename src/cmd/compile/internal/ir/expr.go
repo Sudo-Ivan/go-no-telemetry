@@ -184,15 +184,16 @@ func (n *BinaryExpr) SetOp(op Op) {
 // A CallExpr is a function call Fun(Args).
 type CallExpr struct {
 	miniExpr
-	Fun       Node
-	Args      Nodes
-	DeferAt   Node
-	RType     Node    `mknode:"-"` // see reflectdata/helpers.go
-	KeepAlive []*Name // vars to be kept alive until call returns
-	IsDDD     bool
-	GoDefer   bool // whether this call is part of a go or defer statement
-	NoInline  bool // whether this call must not be inlined
-	UseBuf    bool // use stack buffer for backing store (OAPPEND only)
+	Fun           Node
+	Args          Nodes
+	DeferAt       Node
+	RType         Node    `mknode:"-"` // see reflectdata/helpers.go
+	KeepAlive     []*Name // vars to be kept alive until call returns
+	IsDDD         bool
+	GoDefer       bool // whether this call is part of a go or defer statement
+	NoInline      bool // whether this call must not be inlined
+	UseBuf        bool // use stack buffer for backing store (OAPPEND only)
+	AppendNoAlias bool // backing store proven to be unaliased (OAPPEND only)
 	// whether it's a runtime.KeepAlive call the compiler generates to
 	// keep a variable alive. See #73137.
 	IsCompilerVarLive bool
@@ -1031,6 +1032,9 @@ func StaticCalleeName(n Node) *Name {
 // IsIntrinsicCall reports whether the compiler back end will treat the call as an intrinsic operation.
 var IsIntrinsicCall = func(*CallExpr) bool { return false }
 
+// IsIntrinsicSym reports whether the compiler back end will treat a call to this symbol as an intrinsic operation.
+var IsIntrinsicSym = func(*types.Sym) bool { return false }
+
 // SameSafeExpr checks whether it is safe to reuse one of l and r
 // instead of computing both. SameSafeExpr assumes that l and r are
 // used in the same statement or expression. In order for it to be
@@ -1144,6 +1148,14 @@ func IsReflectHeaderDataField(l Node) bool {
 func ParamNames(ft *types.Type) []Node {
 	args := make([]Node, ft.NumParams())
 	for i, f := range ft.Params() {
+		args[i] = f.Nname.(*Name)
+	}
+	return args
+}
+
+func RecvParamNames(ft *types.Type) []Node {
+	args := make([]Node, ft.NumRecvs()+ft.NumParams())
+	for i, f := range ft.RecvParams() {
 		args[i] = f.Nname.(*Name)
 	}
 	return args
